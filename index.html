@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>SBBK</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+			background-image: url("https://i.ibb.co/yFZfwYXm/IMG-8062.jpg");
+			background-size: cover;
+			touch-action: none;
+			font-family: Arial, sans-serif;
+			-webkit-overflow-scrolling: touch;
+			overscroll-behavior: none;
+			position: fixed;
+			width: 100%;
+			height: 100%;
+		}
+		html {
+			overflow: hidden;
+			height: 100%;
+		}
+		#player {
+			position: absolute;
+			width: 60px;
+			height: 60px;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			image-rendering: pixelated;
+			transition: transform 0.1s ease;
+			z-index: 10;
+		}
+		#joystick {
+			position: absolute;
+			width: 150px;
+			height: 150px;
+			left: 50%;
+			bottom: 40px;
+			transform: translateX(-50%);
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 50%;
+			border: 2px solid rgba(255, 255, 255, 0.5);
+			touch-action: none;
+		}
+		#joystick-handle {
+			position: absolute;
+			width: 60px;
+			height: 60px;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			background: rgba(255, 255, 255, 0.8);
+			border-radius: 50%;
+			transition: transform 0.1s ease-out;
+			touch-action: none;
+		}
+		.flipped {
+			transform: translate(-50%, -50%) scaleX(-1);
+		}
+		.bullet {
+			position: absolute;
+			width: 4px;
+			height: 15px;
+			background-color: yellow;
+			border-radius: 2px;
+			z-index: 5;
+		}
+		.enemy-bullet {
+			position: absolute;
+			width: 4px;
+			height: 15px;
+			background-color: red;
+			border-radius: 2px;
+			z-index: 5;
+		}
+		.enemy {
+			position: absolute;
+			width: 60px;
+			height: 60px;
+			image-rendering: pixelated;
+			transform: rotate(180deg);
+			z-index: 8;
+		}
+		.health-bar {
+			position: absolute;
+			width: 100%;
+			height: 5px;
+			background-color: red;
+			bottom: -10px;
+		}
+		.health-fill {
+			height: 100%;
+			background-color: limegreen;
+			width: 100%;
+		}
+		#player-health {
+			position: absolute;
+			top: 20px;
+			left: 20px;
+			color: white;
+			font-size: 20px;
+			text-shadow: 1px 1px 2px black;
+		}
+		#xp {
+			position: absolute;
+			top: 20px;
+			right: 20px;
+			color: white;
+			font-size: 20px;
+			text-shadow: 1px 1px 2px black;
+		}
+		#total-xp {
+			position: absolute;
+			top: 50px;
+			right: 20px;
+			color: white;
+			font-size: 16px;
+			text-shadow: 1px 1px 2px black;
+		}
+		#game-over, #game-win {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			background: rgba(0, 0, 0, 0.8);
+			color: white;
+			padding: 20px;
+			border-radius: 10px;
+			text-align: center;
+			display: none;
+			z-index: 100;
+		}
+		#restart-btn {
+			margin-top: 15px;
+			padding: 10px 20px;
+			background: #4CAF50;
+			color: white;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			font-size: 16px;
+		}
+	</style>
+</head>
+<body>
+	<img id="player" src="https://i.ibb.co/Pv8j3QxN/IMG-8509.png" alt="Персонаж">
+	<div id="player-health">HP: ❤❤❤❤❤</div>
+	<div id="xp">XP: 0</div>
+	<div id="total-xp">Total XP: 0</div>
+	
+	<div id="joystick">
+		<div id="joystick-handle"></div>
+	</div>
+
+	<div id="game-over">
+		<h2>Игра окончена!</h2>
+		<p id="game-over-text">Вы заработали 0 XP</p>
+		<button id="restart-btn">Новая игра</button>
+	</div>
+
+	<div id="game-win">
+		<h2>Победа!</h2>
+		<p id="game-win-text">Вы заработали 0 XP</p>
+		<button id="restart-btn-win">Новая игра</button>
+	</div>
+
+	<script>
+		const player = document.getElementById('player');
+		const joystick = document.getElementById('joystick');
+		const handle = document.getElementById('joystick-handle');
+		const playerHealthDisplay = document.getElementById('player-health');
+		const xpDisplay = document.getElementById('xp');
+		const totalXpDisplay = document.getElementById('total-xp');
+		const gameOverScreen = document.getElementById('game-over');
+		const gameWinScreen = document.getElementById('game-win');
+		const gameOverText = document.getElementById('game-over-text');
+		const gameWinText = document.getElementById('game-win-text');
+		const restartBtn = document.getElementById('restart-btn');
+		const restartBtnWin = document.getElementById('restart-btn-win');
+		
+		let posX, posY;
+		let speed = 3;
+		let joystickActive = false;
+		let joystickAngle = 0;
+		let joystickDistance = 0;
+		let currentDirection = 1;
+		let lastShotTime = 0;
+		let fireRate = 300;
+		let enemies = [];
+		let bullets = [];
+		let enemyBullets = [];
+		let enemySpawnTimer = 0;
+		let enemySpawnRate = 3000;
+		let xp = 0;
+		let totalXp = 0;
+		let playerHealth = 5;
+		let gameActive = true;
+		let animationFrameId;
+
+		// Загрузка сохраненного XP из Local Storage
+		if (localStorage.getItem('totalXp')) {
+			totalXp = parseInt(localStorage.getItem('totalXp'));
+			totalXpDisplay.textContent = `Total XP: ${totalXp}`;
+		}
+
+		// Инициализация игры
+		function initGame() {
+			// Очистка всех врагов и пуль
+			enemies.forEach(enemy => enemy.element.remove());
+			bullets.forEach(bullet => bullet.element.remove());
+			enemyBullets.forEach(bullet => bullet.element.remove());
+			
+			// Сброс переменных
+			enemies = [];
+			bullets = [];
+			enemyBullets = [];
+			posX = window.innerWidth / 2;
+			posY = window.innerHeight / 2;
+			xp = 0;
+			playerHealth = 5;
+			gameActive = true;
+			
+			// Обновление интерфейса
+			updatePlayerPosition();
+			updatePlayerHealth();
+			xpDisplay.textContent = `XP: ${xp}`;
+			
+			// Скрытие экранов окончания игры
+			gameOverScreen.style.display = 'none';
+			gameWinScreen.style.display = 'none';
+			
+			// Запуск игрового цикла
+			if (animationFrameId) {
+				cancelAnimationFrame(animationFrameId);
+			}
+			gameLoop();
+		}
+
+		// Начальная позиция игрока
+		initGame();
+
+		// Обработчики касаний
+		joystick.addEventListener('touchstart', handleJoystickStart);
+		document.addEventListener('touchmove', handleJoystickMove);
+		document.addEventListener('touchend', handleJoystickEnd);
+		
+		// Обработчики кнопок рестарта
+		restartBtn.addEventListener('click', initGame);
+		restartBtnWin.addEventListener('click', initGame);
+
+		// Предотвращение стандартного поведения касаний
+		document.addEventListener('touchmove', function(e) {
+			if (joystickActive) {
+				e.preventDefault();
+			}
+		}, { passive: false });
+
+		function handleJoystickStart(e) {
+			if (!gameActive) return;
+			e.preventDefault();
+			joystickActive = true;
+			updateJoystickPosition(e.touches[0]);
+		}
+
+		function handleJoystickMove(e) {
+			if (!joystickActive || !gameActive) return;
+			e.preventDefault();
+			updateJoystickPosition(e.touches[0]);
+		}
+
+		function handleJoystickEnd(e) {
+			joystickActive = false;
+			joystickDistance = 0;
+			handle.style.transform = 'translate(-50%, -50%)';
+		}
+
+		function updateJoystickPosition(touch) {
+			const rect = joystick.getBoundingClientRect();
+			const centerX = rect.left + rect.width / 2;
+			const centerY = rect.top + rect.height / 2;
+			
+			const touchX = touch.clientX;
+			const touchY = touch.clientY;
+			
+			const deltaX = touchX - centerX;
+			const deltaY = touchY - centerY;
+			
+			joystickAngle = Math.atan2(deltaY, deltaX);
+			joystickDistance = Math.min(60, Math.sqrt(deltaX * deltaX + deltaY * deltaY));
+			
+			const handleX = joystickDistance * Math.cos(joystickAngle);
+			const handleY = joystickDistance * Math.sin(joystickAngle);
+			
+			handle.style.transform = `translate(calc(-50% + ${handleX}px), calc(-50% + ${handleY}px))`;
+			
+			if (deltaX > 5) {
+				if (currentDirection !== 1) {
+					player.classList.add('flipped');
+					currentDirection = 1;
+				}
+			} else if (deltaX < -5) {
+				if (currentDirection !== -1) {
+					player.classList.remove('flipped');
+					currentDirection = -1;
+				}
+			}
+		}
+
+		function updatePlayerPosition() {
+			player.style.left = posX + 'px';
+			player.style.top = posY + 'px';
+		}
+
+		function spawnEnemy() {
+			const enemy = document.createElement('img');
+			enemy.className = 'enemy';
+			enemy.src = 'https://i.ibb.co/0jGdk3g3/IMG-8510.png';
+			
+			const x = Math.random() * (window.innerWidth - 100) + 50;
+			const y = -60;
+			enemy.style.left = x + 'px';
+			enemy.style.top = y + 'px';
+			
+			const enemyObj = {
+				element: enemy,
+				x: x,
+				y: y,
+				speed: 0.5 + Math.random() * 0.8,
+				health: 3,
+				lastShot: 0,
+				fireRate: 1000 + Math.random() * 500
+			};
+			
+			const healthBar = document.createElement('div');
+			healthBar.className = 'health-bar';
+			const healthFill = document.createElement('div');
+			healthFill.className = 'health-fill';
+			healthBar.appendChild(healthFill);
+			enemy.appendChild(healthBar);
+			
+			document.body.appendChild(enemy);
+			enemies.push(enemyObj);
+		}
+
+		function shoot() {
+			if (!gameActive) return;
+			
+			const now = Date.now();
+			if (now - lastShotTime < fireRate) return;
+			lastShotTime = now;
+			
+			const bullet = document.createElement('div');
+			bullet.className = 'bullet';
+			bullet.style.left = (posX) + 'px';
+			bullet.style.top = (posY - 25) + 'px';
+			document.body.appendChild(bullet);
+			
+			bullets.push({
+				element: bullet,
+				x: posX,
+				y: posY - 25,
+				speed: 8
+			});
+		}
+
+		function enemyShoot(enemy) {
+			const now = Date.now();
+			if (now - enemy.lastShot < enemy.fireRate) return;
+			enemy.lastShot = now;
+			
+			const bullet = document.createElement('div');
+			bullet.className = 'enemy-bullet';
+			bullet.style.left = (enemy.x + 30) + 'px';
+			bullet.style.top = (enemy.y + 60) + 'px';
+			document.body.appendChild(bullet);
+			
+			enemyBullets.push({
+				element: bullet,
+				x: enemy.x + 30,
+				y: enemy.y + 60,
+				speed: 5
+			});
+		}
+
+		function updatePlayerHealth() {
+			const hearts = '❤'.repeat(playerHealth) + '♡'.repeat(5 - playerHealth);
+			playerHealthDisplay.textContent = `HP: ${hearts}`;
+		}
+
+		function updateBullets() {
+			for (let i = bullets.length - 1; i >= 0; i--) {
+				const bullet = bullets[i];
+				bullet.y -= bullet.speed;
+				bullet.element.style.top = bullet.y + 'px';
+				
+				if (bullet.y < -20) {
+					bullet.element.remove();
+					bullets.splice(i, 1);
+					continue;
+				}
+				
+				for (let j = enemies.length - 1; j >= 0; j--) {
+					const enemy = enemies[j];
+					if (
+						bullet.x > enemy.x &&
+						bullet.x < enemy.x + 60 &&
+						bullet.y > enemy.y &&
+						bullet.y < enemy.y + 60
+					) {
+						enemy.health--;
+						enemy.element.querySelector('.health-fill').style.width = (enemy.health / 3 * 100) + '%';
+						
+						bullet.element.remove();
+						bullets.splice(i, 1);
+						
+						if (enemy.health <= 0) {
+							enemy.element.remove();
+							enemies.splice(j, 1);
+							xp++;
+							xpDisplay.textContent = `XP: ${xp}`;
+						}
+						break;
+					}
+				}
+			}
+			
+			for (let i = enemyBullets.length - 1; i >= 0; i--) {
+				const bullet = enemyBullets[i];
+				bullet.y += bullet.speed;
+				bullet.element.style.top = bullet.y + 'px';
+				
+				if (bullet.y > window.innerHeight + 20) {
+					bullet.element.remove();
+					enemyBullets.splice(i, 1);
+					continue;
+				}
+				
+				if (
+					bullet.x > posX - 30 &&
+					bullet.x < posX + 30 &&
+					bullet.y > posY - 30 &&
+					bullet.y < posY + 30
+				) {
+					playerHealth--;
+					updatePlayerHealth();
+					bullet.element.remove();
+					enemyBullets.splice(i, 1);
+					
+					if (playerHealth <= 0) {
+						gameOver(xp);
+					}
+				}
+			}
+		}
+
+		function updateEnemies() {
+			if (!gameActive) return;
+			
+			const now = Date.now();
+			
+			if (now - enemySpawnTimer > enemySpawnRate) {
+				spawnEnemy();
+				enemySpawnTimer = now;
+			}
+			
+			for (let i = enemies.length - 1; i >= 0; i--) {
+				const enemy = enemies[i];
+				enemy.y += enemy.speed;
+				enemy.element.style.top = enemy.y + 'px';
+				
+				if (Math.random() < 0.02) {
+					enemyShoot(enemy);
+				}
+				
+				// Проверка, достиг ли враг нижней границы экрана
+				if (enemy.y > window.innerHeight) {
+					gameOver(xp);
+					return;
+				}
+				
+				if (enemy.y > window.innerHeight + 60) {
+					enemy.element.remove();
+					enemies.splice(i, 1);
+				}
+			}
+		}
+
+		function gameOver(earnedXp) {
+			if (!gameActive) return;
+			
+			gameActive = false;
+			totalXp += earnedXp;
+			localStorage.setItem('totalXp', totalXp.toString());
+			totalXpDisplay.textContent = `Total XP: ${totalXp}`;
+			
+			gameOverText.textContent = `Вы заработали ${earnedXp} XP. Общий XP: ${totalXp}`;
+			gameOverScreen.style.display = 'block';
+		}
+
+		function gameWin(earnedXp) {
+			if (!gameActive) return;
+			
+			gameActive = false;
+			totalXp += earnedXp;
+			localStorage.setItem('totalXp', totalXp.toString());
+			totalXpDisplay.textContent = `Total XP: ${totalXp}`;
+			
+			gameWinText.textContent = `Вы заработали ${earnedXp} XP. Общий XP: ${totalXp}`;
+			gameWinScreen.style.display = 'block';
+		}
+
+		function gameLoop() {
+			if (gameActive) {
+				if (joystickActive && joystickDistance > 15) {
+					posX += Math.cos(joystickAngle) * speed;
+					posY += Math.sin(joystickAngle) * speed;
+					
+					posX = Math.max(40, Math.min(window.innerWidth - 40, posX));
+					posY = Math.max(40, Math.min(window.innerHeight - 40, posY));
+					
+					updatePlayerPosition();
+				}
+				
+				shoot();
+				updateEnemies();
+				updateBullets();
+			}
+			
+			animationFrameId = requestAnimationFrame(gameLoop);
+		}
+
+		// Предотвращение масштабирования на iOS
+		document.addEventListener('gesturestart', function(e) {
+			e.preventDefault();
+		});
+	</script>
+</body>
+</html>
